@@ -1,0 +1,48 @@
+import torch
+from torchvision import transforms, models
+from PIL import Image
+
+import json
+
+# Cargar las clases desde el archivo JSON
+with open('clases.json', 'r') as f:
+    class_names = json.load(f)
+
+print("Clases cargadas:", class_names)
+
+
+# 1. Configuración del dispositivo
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+# 2. Definir el modelo
+model = models.resnet18(pretrained=False)  # No cargamos pesos preentrenados
+num_ftrs = model.fc.in_features
+model.fc = torch.nn.Linear(num_ftrs, 26)  # 26 clases
+model = model.to(device)
+
+# 3. Cargar los pesos guardados
+model.load_state_dict(torch.load('modelo_resnet18_lenguaje_senas.pth'))
+model.eval()
+
+# 4. Transformación de las imágenes de prueba
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
+
+# 5. Clasificación de una imagen de prueba
+def predict_image(image_path, model, transform, device, class_names):
+    image = Image.open(image_path).convert('RGB')
+    image = transform(image).unsqueeze(0).to(device)  # Añadir dimensión para el batch
+    with torch.no_grad():
+        outputs = model(image)
+        _, predicted = torch.max(outputs, 1)
+    return class_names[predicted.item()]
+
+
+# Prueba con una imagen
+image_path = r'C:\Users\jorge\Downloads\test\imagescarpe\G\G23_jpg.rf.4841425e843112c0091ee6ab19eeb8cd.jpg'  # Cambia por la ruta de tu imagen
+predicted_class = predict_image(image_path, model, transform, device, class_names)
+print(f'La imagen pertenece a la clase: {predicted_class}')
+
